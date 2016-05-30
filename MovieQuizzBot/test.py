@@ -12,7 +12,6 @@ DEBUG = True
 TOKEN = "xoxb-38180923028-R0mkiIlTS0yMLhRNMYGZhcvQ"
 RUNNING = True
 
-
 async def producer():
     """Produce a ping message every 10 seconds."""
     await asyncio.sleep(10)
