@@ -1,0 +1,50 @@
+[
+  {
+    "question": "Quel acteur a le rôle principal dans Fight Club ?",
+	"goodAnswer" : "Edward Norton",
+    "badAnswers": [
+      "Tom Hanks",
+      "Brad Pitt"
+    ]
+  },
+  {
+    "question": "Qui joue Forrest Gump dans le film du même nom ?",
+    "goodAnswer" : "Tom Hanks",
+	"badAnswers": [
+      "Leonardo DiCaprio",
+      "Kevin Spacey"
+    ]
+  },
+  {
+    "question": "Quelles sont les paroles correctes de cette chanson du film Frozen ?",
+    "goodAnswer" : "Libérée, délivrée",
+	"badAnswers": [
+      "Ligotée, menottée",
+      "Amoureuse, malheureuse"
+    ]
+  },
+  {
+    "question": "Comment s'appelle le personnage joué par Eminem dans 8Mile ?",
+	"goodAnswer" : "Jimmy 'B-Rabbit' Smith Jr.",
+    "badAnswers": [
+      "Kevin 'PussyDestroyer' Trump",
+      "Johnny 'Sexyboy' Bravo"
+    ]
+  },
+  {
+    "question": "Qui est la gamine dans Léon ?",
+	"goodAnswer" : "Nathalie Portman",
+    "badAnswers": [
+      "Angelina Jolie",
+      "Marion Cotillard"
+    ]
+  },
+  {
+    "question": "Quel type de poisson est Némo ?",
+    "goodAnswer": "Poisson Clown",
+	"badAnswers": [
+      "Poisson Rouge",
+      "Poisson Orange"
+    ]
+  }
+]

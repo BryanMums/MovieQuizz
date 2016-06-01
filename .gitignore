@@ -1,0 +1,5 @@
+/build
+/dist
+/moviequizz.egg-info
+/moviequizz/config.py
+/moviequizz/__pycache__
