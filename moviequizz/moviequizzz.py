@@ -8,7 +8,7 @@ import operator
 from api import api_call
 from config import DEBUG, TOKEN
 
-class moviequizz:
+class Moviequizz:
     def __init__(self, token=TOKEN):
         self.token = token
         self.rtm = None
@@ -23,6 +23,7 @@ class moviequizz:
         # Codecs pour le format de texte (UTF-8)
         json_data = codecs.open("ressources/questions.json", "r", "utf-8")
         self.questions = json.load(json_data)
+
 
     async def sendText(self, message, channel_id, user_name, team_id):
         """Sends a text message to the channel"""
@@ -180,6 +181,6 @@ class moviequizz:
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.set_debug(DEBUG)
-    bot = moviequizz(TOKEN)
+    bot = Moviequizz(TOKEN)
     loop.run_until_complete(bot.connect())
     loop.close()
