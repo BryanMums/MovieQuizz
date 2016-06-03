@@ -41,9 +41,10 @@ If you clone the git repo, you have to follow these steps to make it work :
 
 The package is installable from the repo with git :
 
-* pip install git+https://github.com/BryanMums/MovieQuizz.git
-
-(The installation works but the package execution doesn't...)
+#. Create a virtual environment
+#. pip install git+https://github.com/BryanMums/MovieQuizz.git
+#. The MovieQuizzBot package will install...
+#. **python -m moviequizz** to launch it ! Enjoy :)
 
 --------
 Commands
