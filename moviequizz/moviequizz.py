@@ -4,15 +4,15 @@ import aiohttp
 import random
 import codecs
 import operator
+import os
 
-from api import api_call
-from config import DEBUG, TOKEN
+from .api import api_call
 
 
 class Moviequizz:
     """Bot main class."""
 
-    def __init__(self, token=TOKEN):
+    def __init__(self, token):
         """
         Constructor of bot class.
         The token is either passed in argument or read in the config file.
@@ -30,7 +30,9 @@ class Moviequizz:
         self.currentAskedQuestions = {} # Asked questions during the game (not yet answered)
 
         # Codecs pour le format de texte (UTF-8)
-        json_data = codecs.open("ressources/questions.json", "r", "utf-8")
+        print("Fichier "+os.path.dirname(__file__))
+        self.dirname = os.path.join(os.path.dirname(__file__), "ressources")
+        json_data = codecs.open("{}/questions.json".format(self.dirname), "r", "utf-8")
         self.questions = json.load(json_data) # Read the json questions file and create a dict
 
 
@@ -63,7 +65,7 @@ class Moviequizz:
 
         if self.currentAskedQuestions[user_id] == answeredQuestionId: # Test if the answered question id is correct
             data = {}
-            with codecs.open("ressources/ranking.json", "r", "utf-8") as json_data: # Open the ranking file to update it (read mode)
+            with codecs.open("{}/ranking.json".format(self.dirname), "r", "utf-8") as json_data: # Open the ranking file to update it (read mode)
 
                 data = json.load(json_data) # Dict from json data ranking file
 
@@ -76,7 +78,7 @@ class Moviequizz:
                 else: # If the user is new (first time good answer)
                     data[user] = pointsToAdd
 
-            with open('ressources/ranking.json', 'w') as outfile: # Open ranking file (write mode)
+            with open("{}/ranking.json".format(self.dirname), 'w') as outfile: # Open ranking file (write mode)
                 json.dump(data, outfile) # Save the modifications (new scores entry or update)
 
             # Success message
@@ -133,7 +135,7 @@ class Moviequizz:
        :param team_id: team id
         """
 
-        with codecs.open("ressources/ranking.json", "r", "utf-8") as json_data:
+        with codecs.open("{}/ranking.json".format(self.dirname), "r", "utf-8") as json_data:
             data = json.load(json_data)
 
             user = "{}-{}".format(user_infos["user"]["name"], str(team_id)) # User string to write
@@ -158,7 +160,7 @@ class Moviequizz:
         """
         message = "Top 10 du Quizz Movie : \n" # Begin the ranking message
 
-        with codecs.open("ressources/ranking.json", "r", "utf-8") as json_data: # Open the ranking file read mode
+        with codecs.open("{}/ranking.json".format(self.dirname), "r", "utf-8") as json_data: # Open the ranking file read mode
             data = json.load(json_data)
 
             # Get the top ten players reverse score ordered
@@ -243,11 +245,3 @@ class Moviequizz:
                     assert msg.tp == aiohttp.MsgType.text
                     message = json.loads(msg.data)
                     asyncio.ensure_future(self.process(message))
-
-
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.set_debug(DEBUG)
-    bot = Moviequizz(TOKEN)
-    loop.run_until_complete(bot.connect())
-    loop.close()

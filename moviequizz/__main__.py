@@ -1,11 +1,11 @@
-import moviequizz
 import asyncio
-DEBUG = True
+import os
+
+from . import moviequizz
 
 if __name__ == "__main__":
+	token = os.environ.get('TOKEN')
 	loop = asyncio.get_event_loop()
-	loop.set_debug(DEBUG)
-
-	bot = moviequizz.Moviequizz()
+	bot = moviequizz.Moviequizz(token)
 	loop.run_until_complete(bot.connect())
 	loop.close()
