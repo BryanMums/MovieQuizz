@@ -1,4 +1,5 @@
-from setuptools import setup
+from setuptools import setup, find_packages
+
 
 setup(name='moviequizz',
       version='1',
@@ -7,5 +8,9 @@ setup(name='moviequizz',
       author='Infinit8',
       author_email='contact@infinit8.io',
       license='MIT',
-      packages=['moviequizz'],
+      packages=find_packages(),
+      install_requires=('aiohttp', 'asyncio'),
+      extra_requires={
+          'doc': ('Sphinx', 'sphinx_rtd_theme'),
+      },
       zip_safe=False)

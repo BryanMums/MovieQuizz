@@ -1,0 +1,339 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>moviequizz &mdash; MovieQuizz 1.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="MovieQuizz 1.0.1 documentation" href="../index.html" />
+    <link rel="up" title="Module code" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for moviequizz</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">aiohttp</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">codecs</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+
+<span class="kn">from</span> <span class="nn">api</span> <span class="kn">import</span> <span class="n">api_call</span>
+<span class="kn">from</span> <span class="nn">config</span> <span class="kn">import</span> <span class="n">DEBUG</span><span class="p">,</span> <span class="n">TOKEN</span>
+
+
+<div class="viewcode-block" id="Moviequizz"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz">[docs]</a><span class="k">class</span> <span class="nc">Moviequizz</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Bot main class.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">TOKEN</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Constructor of bot class.</span>
+<span class="sd">        The token is either passed in argument or read in the config file.</span>
+
+<span class="sd">       :param TOKEN: the slack bot generated token</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">token</span> <span class="o">=</span> <span class="n">token</span> <span class="c1"># Slack bot token</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rtm</span> <span class="o">=</span> <span class="bp">None</span> <span class="c1"># Real Time Messaging connection</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">api</span> <span class="o">=</span> <span class="p">{</span> <span class="c1"># Dict of available bot commands</span>
+            <span class="s2">&quot;help&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">help</span><span class="p">,</span> <span class="c1"># For the help command</span>
+            <span class="s2">&quot;rank&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">rank</span><span class="p">,</span> <span class="c1"># For the rank command (will show playing user score)</span>
+            <span class="s2">&quot;ranking&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">ranking</span><span class="p">,</span> <span class="c1"># For the ranking command (will show full ranking)</span>
+            <span class="s2">&quot;ask&quot;</span> <span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">question</span> <span class="c1"># For the question command (will ask a question)</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">currentAskedQuestions</span> <span class="o">=</span> <span class="p">{}</span> <span class="c1"># Asked questions during the game (not yet answered)</span>
+
+        <span class="c1"># Codecs pour le format de texte (UTF-8)</span>
+        <span class="n">json_data</span> <span class="o">=</span> <span class="n">codecs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;ressources/questions.json&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">questions</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span> <span class="c1"># Read the json questions file and create a dict</span>
+
+
+<div class="viewcode-block" id="Moviequizz.sendText"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.sendText">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">sendText</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sends a message to the user.</span>
+
+<span class="sd">       :param message: the sent message</span>
+<span class="sd">       :param channel_id: id of channel</span>
+<span class="sd">       :param user_infos: the receiver</span>
+<span class="sd">       :param team_id: team id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Return the message to send with every information</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="n">api_call</span><span class="p">(</span><span class="s1">&#39;chat.postMessage&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;message&quot;</span><span class="p">,</span>
+                                                   <span class="s2">&quot;channel&quot;</span><span class="p">:</span> <span class="n">channel_id</span><span class="p">,</span>
+                                                   <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;@{0}&gt; {1}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">user_infos</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="n">message</span><span class="p">),</span>
+                                                   <span class="s2">&quot;team&quot;</span><span class="p">:</span> <span class="n">team_id</span><span class="p">})</span></div>
+
+<div class="viewcode-block" id="Moviequizz.reponse"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.reponse">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">reponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">answeredQuestionId</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tests if the player answer is correct. Called when the bot receive an answer.</span>
+<span class="sd">        Add points to ranking when correct and display a message (failure or success).</span>
+
+<span class="sd">       :param user_id: user id</span>
+<span class="sd">       :param answeredQuestionId: the answered id from the user</span>
+<span class="sd">       :param channel_id: id of channel</span>
+<span class="sd">       :param user_infos: the receiver</span>
+<span class="sd">       :param team_id: team id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">currentAskedQuestions</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span> <span class="o">==</span> <span class="n">answeredQuestionId</span><span class="p">:</span> <span class="c1"># Test if the answered question id is correct</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">with</span> <span class="n">codecs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;ressources/ranking.json&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">json_data</span><span class="p">:</span> <span class="c1"># Open the ranking file to update it (read mode)</span>
+
+                <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span> <span class="c1"># Dict from json data ranking file</span>
+
+                <span class="n">user</span> <span class="o">=</span> <span class="s2">&quot;{}-{}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">user_infos</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">team_id</span><span class="p">))</span> <span class="c1"># The user string name to get/write in the file</span>
+
+                <span class="n">pointsToAdd</span> <span class="o">=</span> <span class="mi">50</span> <span class="c1"># Easy to change, could be a class property or question-specific (new field in JSON?)</span>
+
+                <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="p">):</span> <span class="c1"># If user exists</span>
+                    <span class="n">data</span><span class="p">[</span><span class="n">user</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="p">)</span> <span class="o">+</span> <span class="n">pointsToAdd</span>
+                <span class="k">else</span><span class="p">:</span> <span class="c1"># If the user is new (first time good answer)</span>
+                    <span class="n">data</span><span class="p">[</span><span class="n">user</span><span class="p">]</span> <span class="o">=</span> <span class="n">pointsToAdd</span>
+
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;ressources/ranking.json&#39;</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span> <span class="c1"># Open ranking file (write mode)</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">outfile</span><span class="p">)</span> <span class="c1"># Save the modifications (new scores entry or update)</span>
+
+            <span class="c1"># Success message</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Felicitations ! Bonne reponse !</span><span class="se">\n\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot;Veuillez entrer une commande&quot;</span>
+            <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">sendText</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Failure message</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Biiiip ! Mauvaise reponse ! </span><span class="se">\n\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot;Veuillez entrer une commande&quot;</span>
+            <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">sendText</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Moviequizz.question"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.question">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">question</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">team_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Asks a question and add it to the currentAskedQuestions</span>
+
+<span class="sd">       :param message: the sent message</span>
+<span class="sd">       :param channel_id: id of channel</span>
+<span class="sd">       :param user_infos: the receiver</span>
+<span class="sd">       :param team_id: team id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">q</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">questions</span><span class="p">)</span> <span class="c1"># Random question selection from list</span>
+        <span class="n">answers</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="s2">&quot;badAnswers&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">q</span><span class="p">[</span><span class="s2">&quot;goodAnswer&quot;</span><span class="p">]]</span> <span class="c1"># Save all possible answers</span>
+        <span class="n">goodAnswer</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="s2">&quot;goodAnswer&quot;</span><span class="p">]</span> <span class="c1"># Save the good answer</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">answers</span><span class="p">)</span> <span class="c1"># Shuffle everything</span>
+
+        <span class="n">choices</span> <span class="o">=</span> <span class="p">{}</span> <span class="c1"># Dict of choices</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">answers</span><span class="p">)):</span> <span class="c1"># For every possible answer</span>
+            <span class="n">choices</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="n">answers</span><span class="p">[</span><span class="n">i</span><span class="p">];</span> <span class="c1"># Fill the choices dict with normal people understandable indexes</span>
+
+        <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;{} </span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">q</span><span class="p">[</span><span class="s2">&quot;question&quot;</span><span class="p">])</span> <span class="c1"># Start the string question message</span>
+
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">choices</span><span class="p">):</span>
+            <span class="n">message</span> <span class="o">+=</span> <span class="p">(</span><span class="s2">&quot;Reponse {} : {} </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">choices</span><span class="p">[</span><span class="n">key</span><span class="p">])</span> <span class="c1"># Add choices to question message</span>
+
+        <span class="nb">id</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">choices</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span> <span class="o">==</span> <span class="n">goodAnswer</span><span class="p">:</span> <span class="c1"># Retrieve the good answer id (lol). Should probably do differently...</span>
+                <span class="nb">id</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">currentAskedQuestions</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span> <span class="c1"># Put the entry in the dict with good answer id</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">sendText</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Moviequizz.rank"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.rank">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">rank</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">team_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Shows the rank and score of the current playing user</span>
+
+<span class="sd">       :param channel_id: id of channel</span>
+<span class="sd">       :param user_infos: the receiver</span>
+<span class="sd">       :param user_id: user id</span>
+<span class="sd">       :param team_id: team id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">with</span> <span class="n">codecs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;ressources/ranking.json&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">json_data</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
+
+            <span class="n">user</span> <span class="o">=</span> <span class="s2">&quot;{}-{}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">user_infos</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">team_id</span><span class="p">))</span> <span class="c1"># User string to write</span>
+
+            <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="p">):</span>
+                <span class="c1"># (Epic line to) get the position from ranking array revert sorted depending on the user</span>
+                <span class="n">rank</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">1</span><span class="p">))[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">index</span><span class="p">((</span><span class="n">user</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">user</span><span class="p">)))</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="c1"># Score info message</span>
+                <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Votre score est de : {} </span><span class="se">\n</span><span class="s2"> Place au classement : {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">user</span><span class="p">]),</span> <span class="nb">str</span><span class="p">(</span><span class="n">rank</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Vous n&#39;avez pas encore de score. Veuillez jouer !&quot;</span> <span class="c1"># Never played yet</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">sendText</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Moviequizz.ranking"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.ranking">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">ranking</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">team_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Shows the top 10 ranking list with the best players ever.</span>
+
+<span class="sd">       :param channel_id: id of channel</span>
+<span class="sd">       :param user_infos: the receiver</span>
+<span class="sd">       :param team_id: team id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="s2">&quot;Top 10 du Quizz Movie : </span><span class="se">\n</span><span class="s2">&quot;</span> <span class="c1"># Begin the ranking message</span>
+
+        <span class="k">with</span> <span class="n">codecs</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;ressources/ranking.json&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">json_data</span><span class="p">:</span> <span class="c1"># Open the ranking file read mode</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
+
+            <span class="c1"># Get the top ten players reverse score ordered</span>
+            <span class="n">l</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="bp">True</span><span class="p">)[</span><span class="mi">0</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span>
+
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)):</span> <span class="c1"># For each top ten players</span>
+                <span class="n">message</span> <span class="o">+=</span> <span class="s2">&quot;Numéro {} : {}, Score : {}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">),</span> <span class="n">l</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">sendText</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Moviequizz.help"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.help">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">help</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">team_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Shows help and commands for the moviequizz bot.</span>
+
+<span class="sd">       :param channel_id: id of channel</span>
+<span class="sd">       :param user_infos: the receiver</span>
+<span class="sd">       :param team_id: team id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">helpMessage</span> <span class="o">=</span> <span class="s2">&quot;Bienvenue dans l&#39;aide du bot MovieQuizz ! </span><span class="se">\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot;Ce bot va tester vos connaissances cinématographiques ! </span><span class="se">\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot;Les commandes disponibles sont les suivantes : </span><span class="se">\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot; - ask : vous questionne à propos d&#39;un film </span><span class="se">\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot; - rank : affiche votre position et score  </span><span class="se">\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot; - ranking : affiche les 10 meilleures joueurs  </span><span class="se">\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot; - help : Vous connaissez déjà celle-là. </span><span class="se">\n</span><span class="s2">&quot;</span> \
+                      <span class="s2">&quot;Amusez-vous bien les lapins !&quot;</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">sendText</span><span class="p">(</span><span class="n">helpMessage</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Moviequizz.error"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.error">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">team_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Shows the error message to the channel, in case of bad input</span>
+
+<span class="sd">       :param channel_id: id of channel</span>
+<span class="sd">       :param user_infos: the receiver</span>
+<span class="sd">       :param team_id: team id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Message de commande incorrecte</span>
+        <span class="n">error</span> <span class="o">=</span> <span class="s2">&quot;Commande invalide. Veuillez utiliser la commande [help] pour plus d&#39;informations.&quot;</span>
+        <span class="k">return</span> <span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">sendText</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span><span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Moviequizz.process"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.process">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Processes input messages.</span>
+
+<span class="sd">       :param channel_id: id of channel</span>
+<span class="sd">       :param user_infos: the receiver</span>
+<span class="sd">       :param team_id: team id</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># If the message is a &#39;message&#39; type (from player)</span>
+        <span class="k">if</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;message&#39;</span> <span class="ow">and</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;subtype&#39;</span><span class="p">)</span> <span class="o">!=</span> <span class="s1">&#39;bot_message&#39;</span><span class="p">:</span>
+
+            <span class="n">channel_id</span> <span class="o">=</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;channel&#39;</span><span class="p">)</span> <span class="c1"># Channel id</span>
+            <span class="n">team_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtm</span><span class="p">[</span><span class="s1">&#39;team&#39;</span><span class="p">][</span><span class="s1">&#39;id&#39;</span><span class="p">]</span>  <span class="c1"># Get id of the active team</span>
+            <span class="n">user_id</span> <span class="o">=</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">)</span> <span class="c1"># Get user id</span>
+
+            <span class="n">user_infos</span> <span class="o">=</span> <span class="n">await</span> <span class="n">api_call</span><span class="p">(</span><span class="s1">&#39;users.info&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;user&#39;</span><span class="p">:</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;user&#39;</span><span class="p">)})</span> <span class="c1"># all user infos</span>
+
+            <span class="n">message_text</span> <span class="o">=</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;text&#39;</span><span class="p">)</span> <span class="c1"># Message</span>
+
+            <span class="c1"># Check if user has to answer a question</span>
+            <span class="k">if</span> <span class="n">user_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">currentAskedQuestions</span><span class="p">:</span>
+                <span class="c1"># Check if user gave a good answer</span>
+                <span class="k">print</span><span class="p">(</span><span class="n">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">reponse</span><span class="p">(</span><span class="n">user_id</span><span class="p">,</span> <span class="n">message_text</span><span class="p">,</span> <span class="n">channel_id</span><span class="p">,</span> <span class="n">user_infos</span><span class="p">,</span> <span class="n">team_id</span><span class="p">))</span>
+                <span class="c1"># Remove user from current asked questions</span>
+                <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">currentAskedQuestions</span><span class="p">[</span><span class="n">user_id</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">message_text</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">error</span>
+                <span class="k">print</span><span class="p">(</span><span class="n">await</span> <span class="n">action</span><span class="p">(</span><span class="n">channel_id</span><span class="p">,</span> <span class="n">user_infos</span><span class="p">,</span> <span class="n">user_id</span><span class="p">,</span> <span class="n">team_id</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="Moviequizz.connect"><a class="viewcode-back" href="../classbot.html#moviequizz.Moviequizz.connect">[docs]</a>    <span class="n">async</span> <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Connects the bot to Slack</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rtm</span> <span class="o">=</span> <span class="n">await</span> <span class="n">api_call</span><span class="p">(</span><span class="s1">&#39;rtm.start&#39;</span><span class="p">)</span> <span class="c1"># Start the connection</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtm</span><span class="p">[</span><span class="s1">&#39;ok&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtm</span><span class="p">[</span><span class="s1">&#39;error&#39;</span><span class="p">]</span>
+
+        <span class="k">with</span> <span class="n">aiohttp</span><span class="o">.</span><span class="n">ClientSession</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
+            <span class="n">async</span> <span class="k">with</span> <span class="n">client</span><span class="o">.</span><span class="n">ws_connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rtm</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">])</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
+                <span class="n">async</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="n">msg</span><span class="o">.</span><span class="n">tp</span> <span class="o">==</span> <span class="n">aiohttp</span><span class="o">.</span><span class="n">MsgType</span><span class="o">.</span><span class="n">text</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+                    <span class="n">asyncio</span><span class="o">.</span><span class="n">ensure_future</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">message</span><span class="p">))</span></div></div>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+    <span class="n">loop</span><span class="o">.</span><span class="n">set_debug</span><span class="p">(</span><span class="n">DEBUG</span><span class="p">)</span>
+    <span class="n">bot</span> <span class="o">=</span> <span class="n">Moviequizz</span><span class="p">(</span><span class="n">TOKEN</span><span class="p">)</span>
+    <span class="n">loop</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">bot</span><span class="o">.</span><span class="n">connect</span><span class="p">())</span>
+    <span class="n">loop</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2016, Infinit8.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
