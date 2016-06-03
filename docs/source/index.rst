@@ -31,16 +31,11 @@ Make it work
 
 If you clone the git repo, you have to follow these steps to make it work :
 
-**Clone the git**
-
-#. Create a **config.py** file in the moviequizz folder
-#. Set a **DEBUG** var (True or False)
-#. Set a **TOKEN** var with your slack bot token key
-
 **pip install**
 
 The package is installable from the repo with git :
 
+#. Create a **TOKEN** environment variable with your slack bot token as value
 #. Create a virtual environment
 #. pip install git+https://github.com/BryanMums/MovieQuizz.git
 #. The MovieQuizzBot package will install...

@@ -29,14 +29,12 @@ class Moviequizz:
         }
         self.currentAskedQuestions = {} # Asked questions during the game (not yet answered)
 
-        # Codecs pour le format de texte (UTF-8)
-        print("Fichier "+os.path.dirname(__file__))
-        self.dirname = os.path.join(os.path.dirname(__file__), "ressources")
-        json_data = codecs.open("{}/questions.json".format(self.dirname), "r", "utf-8")
+        self.dirname = os.path.join(os.path.dirname(__file__), "ressources") # Path to ressources as bot property
+        json_data = codecs.open("{}/questions.json".format(self.dirname), "r", "utf-8") # Open question file to get questions (thx captain obvious)
         self.questions = json.load(json_data) # Read the json questions file and create a dict
 
 
-    async def sendText(self, message, channel_id,user_infos, team_id):
+    async def sendText(self, message, channel_id, user_infos, team_id):
         """
         Sends a message to the user.
 
@@ -51,7 +49,7 @@ class Moviequizz:
                                                    "text": "<@{0}> {1}".format(user_infos["user"]["name"], message),
                                                    "team": team_id})
 
-    async def reponse(self, user_id, answeredQuestionId, channel_id,user_infos, team_id):
+    async def reponse(self, user_id, answeredQuestionId, channel_id, user_infos, team_id):
         """
         Tests if the player answer is correct. Called when the bot receive an answer.
         Add points to ranking when correct and display a message (failure or success).
@@ -91,11 +89,10 @@ class Moviequizz:
                       "Veuillez entrer une commande"
             return await self.sendText(message, channel_id,user_infos, team_id)
 
-    async def question(self, channel_id,user_infos, user_id, team_id):
+    async def question(self, channel_id, user_infos, user_id, team_id):
         """
         Asks a question and add it to the currentAskedQuestions
 
-       :param message: the sent message
        :param channel_id: id of channel
        :param user_infos: the receiver
        :param team_id: team id
@@ -125,7 +122,7 @@ class Moviequizz:
         return await self.sendText(message, channel_id,user_infos, team_id)
 
 
-    async def rank(self, channel_id,user_infos, user_id, team_id):
+    async def rank(self, channel_id, user_infos, user_id, team_id):
         """
         Shows the rank and score of the current playing user
 
@@ -171,7 +168,7 @@ class Moviequizz:
         return await self.sendText(message, channel_id,user_infos, team_id)
 
 
-    async def help(self, channel_id,user_infos, user_id, team_id):
+    async def help(self, channel_id, user_infos, user_id, team_id):
         """
         Shows help and commands for the moviequizz bot.
 
