@@ -9,7 +9,7 @@ setup(name='moviequizz',
       author_email='contact@infinit8.io',
       license='MIT',
       packages=find_packages(),
-      install_requires=('aiohttp', 'asyncio'),
+      install_requires=('aiohttp'),
       extra_requires={
           'doc': ('Sphinx', 'sphinx_rtd_theme'),
       },
